@@ -106,7 +106,6 @@ function printRow(row, color){
     }
     printDividerRow();
 }
-
 function printRows(){
     console.log("");
     if(myTable.title !== "") printTitleRow();
@@ -332,16 +331,22 @@ function findReadline(){
     rl.question("Enter key words : ",(input)=>{
         if(input === "") commandList();
         const inputArr = input.split(/\s+/).map(a=>a.toLowerCase());
-        const resultRows = [];
-        for(let row of myTable.rows){
-            const valuesStr = Object.values(row).join("").toLowerCase();
-            for(let word of inputArr){
-                if(valuesStr.search(word) !== NO_FIND) resultRows.push(row);        
+        let resultRows = myTable.rows;
+        for(let word of inputArr){
+            for(let row of resultRows){
+                resultRows = resultRows.filter(row => {
+                    const valuesStr = Object.values(row).join("").toLowerCase();
+                    return valuesStr.search(word) !== NO_FIND;
+                });
             }
         }
-        printHeaderRow();
-        for(let row of resultRows){            
-            printRow(row, NO_COLOR);
+        if(resultRows.length > 0){
+            printHeaderRow();
+            for(let row of resultRows){            
+                printRow(row, NO_COLOR);
+            }
+        }else{
+            console.log("Can't find rows match the keywords.");
         }
         commandList();     
     });
@@ -472,28 +477,53 @@ function editColumnEntry(entry, column){
         rl.question(`Enter new datatype(date or text) to replace ${COLOR_RED}${column.datatype}${COLOR_RESET} : `,(input)=>{
             const colType = input.trim();
             if(colType === ""){
-                showMain();
-            }else if(colType === column.datatype){
-                console.log("Entered datatype is same as existing one.");
-                showMain();
+                changeColumnPosition(column);
             }else if(colType === "text"){
                 column.datatype = colType;
-                showMain();
+                changeColumnPosition(column);
             }else if(colType === "date"){
                 const result = convertColumnTypeDate(column.key);
                 if(result){
                     column.datatype = colType;
-                    showMain();
+                    changeColumnPosition(column);
                 }else{
                     console.log("Content doesn't fit in date format. Change column datatype failed. ");
-                    commandList(); 
+                    editColumnEntry("datatype", column); 
                 }
             }else{
                 console.log("Only support date or text datatype.");
-                commandList(); 
+                editColumnEntry("datatype", column);  
             }
         })
     }
+}
+function changeColumnPosition(column){
+    rl.question("Enter the position of this column( a number biger as 0) : ", (input)=>{
+        const colPosition = Number(input.trim());
+        if(Number.isInteger(colPosition)){
+            if(colPosition === 0){
+            console.log("Position 0 is reserved for Id.");
+            editColumnEntry("datatype", column);
+            }else if(colPosition > 0 && colPosition < myTable.columnsSetting.length){
+                const colIndex = myTable.columnsSetting.findIndex(col => col.key === column.key);
+                const copyCol = Object.assign(column);
+                myTable.columnsSetting.splice(colIndex, 1);
+                myTable.columnsSetting.splice(colPosition, 0, copyCol);
+                showMain();
+            }
+            else{
+                const colIndex = myTable.columnsSetting.findIndex(col => col.key === column.key);
+                const copyCol = Object.assign(column);
+                myTable.columnsSetting.splice(colIndex, 1);
+                myTable.columnsSetting.push(column);
+                showMain();
+            }
+        }else{
+            console.log("Invalid");
+            editColumnEntry("datatype", column);
+        }
+    });
+
 }
 function convertColumnTypeDate(key){
     const contentArr = myTable.rows.filter(row => row[key] !== "" &&  row[key] !== undefined).map(row => row[key]);
